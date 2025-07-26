@@ -62,6 +62,7 @@ ids<-bitr(ensemble_list, fromType="ENSEMBL",
 #   mutate( #Disease = ifelse(Disease =="Normal-PDAC", "Normal-PDAC","Normal-Non-Progressor" ) ,
 #     Disease = factor(Disease, levels= c("Isolated LGD", "Progressor LGD w PDAC")))
 # sheet_name <- "ProLGDwPDAC_Vs_IsoLGD"
+
 list <- c(unique(condition$Disease)[-9], "Isolated HGD", "Progressor LGD w HGD")
 list_dysplasia <- unique(condition$Disease)[unique(condition$Disease)!= "Normal-LGD"]
 
@@ -77,12 +78,12 @@ list_dysplasia <-c(  "Progressor LGD w PDAC","Progressor HGD w PDAC", "PDAC" )
 counts_mtx <- counts %>% dplyr::select(which(colnames(counts) %in% sample_mtx$Sample_ID)) %>% as.matrix()
 
 
-for( dysplasia in list_dysplasia ){
-  plot_name <- paste0(dysplasia, " vs Isolated HGD")
-  sample_mtx <- condition %>% filter(Disease %in% c("Isolated HGD", dysplasia)) %>%
+for( dysplasia in list_dysplasia ){}
+  plot_name <- paste0(dysplasia, " vs Progressor LGD w PDAC")
+  sample_mtx <- condition %>% filter(Disease %in% c("Progressor LGD w PDAC", dysplasia)) %>%
     mutate( #Disease = ifelse(Disease =="Progressor LGD w HGD", "Normal-PDAC","Normal-Non-Progressor" ) ,
-      Disease = factor(Disease, levels= c("Isolated HGD", dysplasia) ))
-  sheet_name <- paste0(i, "_Vs_isoHGD")
+      Disease = factor(Disease, levels= c("Progressor LGD w PDAC", dysplasia) ))
+  sheet_name <- paste0(i, "_Vs_isoLGD")
   
   
   plot_name <- paste0(dysplasia, " vs Isolated HGD")
@@ -96,6 +97,7 @@ for( dysplasia in list_dysplasia ){
 levels(sample_mtx$Disease)
 dim(sample_mtx)
 dim(counts_mtx)
+
 
 ## diffential expression DEseq2
 
@@ -112,11 +114,21 @@ res2 <- res %>% as.data.frame() %>%
   mutate(ENSEMBL = unlist(lapply(strsplit(ENSEMBLID, '\\.'), '[[',1)),
          comparison = plot_name) %>% relocate(comparison) %>%
   left_join(ids)   %>%
-  filter(!is.na(ENTREZID), !is.na(padj)) %>%
-  filter( !str_detect(SYMBOL, "LOC|RNA" )) %>%
+  filter(!is.na(ENTREZID) ) %>%
+  filter(!is.na(padj) ) %>%     
+  filter(!duplicated(SYMBOL)) 
+  # filter( !str_detect(SYMBOL, "LOC|RNA" )) %>%
   #  filter(!is.na(ENTREZID) ) %>%
-  arrange(desc(abs(log2FoldChange)))
-# 
+  # arrange(desc(abs(log2FoldChange)))
+
+
+write.csv(res2 %>% column_to_rownames("SYMBOL") %>%
+            mutate(logFC = log2FoldChange,
+                   pval = padj,
+                   expr = baseMean) , 
+           "data/DE_LGDwPDACVsHGDwPDAC.csv")
+
+
 # 
 # # cutoffs
 # lfc = 2        # log fold change
@@ -145,7 +157,7 @@ ggplot(tab_res, aes(x = logFC, y = negLogPval,  label = delabel )) +
 
 ### pathway enrichment
 res3 <- res %>% as.data.frame() %>% 
-  rownames_to_column(var ="ENSEMBL") %>% 
+  rownames_to_column(var = "ENSEMBL") %>% 
   mutate(ENSEMBL = unlist(lapply(strsplit(ENSEMBL, '\\.'), '[[',1)) ) %>%
   left_join(ids) %>%
   filter(!is.na(ENTREZID), !is.na(stat)) %>%

@@ -83,6 +83,8 @@ condition <- BE02_case_list %>% filter(!Sample_ID %in% c("BE02_65A" , "BE02_77A"
                            # filter(Grade !="normal") %>%
                        filter(Sample_ID %in% colnames(df_count))
 
+length(unique(condition$Path_ID))
+
 for(col in colnames(df_count)){ 
 write.table(df_count %>% rownames_to_column("ENSEMBL") %>% 
               mutate(sample = round(df_count[[col]]),

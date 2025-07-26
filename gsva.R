@@ -7,7 +7,7 @@ library(biomaRt)
 library(ggplot2)
 library(ggfortify)
 library(umap)
-library(biomaRt)
+# library(biomaRt)
 library(clusterProfiler)
 library(tidyr)
 library(tibble)
@@ -35,9 +35,10 @@ counts_entreID <- counts_entreID[!(duplicated(counts_entreID$ENTREZID)),]
 rownames(counts_entreID) <- counts_entreID$ENTREZID
 counts_entreID <- counts_entreID %>% dplyr::select(-c("ENSEMBL", "ENTREZID"))
 
-condition_subset <- condition %>% filter(!str_detect(Disease, "Normal"))
-counts_entreID <- counts_entreID %>% dplyr::select(condition_subset$Sample_ID)
+# condition_subset <- condition %>% filter(!str_detect(Disease, "Normal"))
+# counts_entreID <- counts_entreID %>% dplyr::select(condition_subset$Sample_ID)
 
+counts_entreID <- counts_entreID %>% dplyr::select(condition$Sample_ID)
 #ssgsea pathway enrichment
 
 pathways.hallmark <- fgsea::gmtPathways("~/Documents/Rutgers_CW/De_lab/download_resources/h.all.v2024.1.Hs.entrez.gmt") # for human
@@ -46,7 +47,7 @@ gsvapar <- ssgseaParam(as.matrix(counts_entreID), pathways.hallmark)
 
 ssgsea_hallmark <- gsva(gsvapar )
 
-heatmap(ssgsea_hallmark, main = "ssGSEA: Hallmark Pathways")
+stats::heatmap(ssgsea_hallmark, main = "ssGSEA: Hallmark Pathways")
         
  
 ## careting UMAP                                                      
@@ -59,9 +60,9 @@ umap_df <- data.frame(umap_res$layout) %>%
   # Turn sample IDs stored as row names into a column
   tibble::rownames_to_column("Sample_ID") %>%
   # Add the metadata into this data frame; match by sample IDs
-  dplyr::left_join(condition_subset, by = "Sample_ID") %>%
-  mutate(Disease = factor(Disease, levels = c(#"Normal-LGD", "Normal-HGD",
-                                              # "Normal-PDAC",
+  dplyr::left_join(condition, by = "Sample_ID") %>%
+  mutate(Disease = factor(Disease, levels = c("Normal-LGD", "Normal-HGD",
+                                               "Normal-PDAC",
                                               "Isolated LGD",
                                               "Progressor LGD w HGD",
                                               "Isolated HGD", 
@@ -69,7 +70,7 @@ umap_df <- data.frame(umap_res$layout) %>%
                                               "Progressor HGD w PDAC",
                                               "PDAC") ))
 
-color <- c( #"grey95", "grey80", "grey60", 
+color <- c( "grey95", "grey80", "grey60", 
            "#2F56B5",#115C80", 
            "#2295C7", #309898" ,#479685", 
            "#00A86B", #FF9F00", 
@@ -124,3 +125,27 @@ t(ssgsea_hallmark) %>% as.data.frame() %>%
         geom_boxplot(position = position_dodge()) +
         facet_wrap(~Description, scales = "free_y",nrow = 1)
 
+
+
+### creating the line plot including the normal
+df_gsea <- t(ssgsea_hallmark) %>% as.data.frame() %>% 
+            
+            rownames_to_column('Sample_ID') %>%
+          pivot_longer(!Sample_ID, values_to = "score", names_to = 'pathways') %>%
+           left_join(condition %>% dplyr::select(Sample_ID, Category, Disease, Grade, Path_ID))
+           
+summary(df_gsea$score)
+# for (path in unique(df_gsea$pathways)[11:15]){
+p <- df_gsea %>% #filter(Category !="PDAC") %>%
+    # filter(pathways == path) %>%
+  mutate(pathways = str_replace(str_remove(pathways, "HALLMARK_"), "_"," "),
+     Grade = factor(Grade , levels = c("normal", "low grade", "high grade", "invasive")),
+         Category = factor(Category, levels = c("LGD", "HGD", "PDAC"))) %>%
+ ggplot(aes(x = Grade, y = score,  group = Path_ID,color =  Category)) +
+  geom_line() +
+  # labs(title = path) +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  facet_wrap(~pathways, nrow = 8, scales= "free_y", labeller = label_wrap_gen(width = 15, multi_line = TRUE))
+print(p)
+
+# }
